@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI VisionGuard Alerts</title>
+
+  <!-- ✅ OneSignal SDK v16 -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+
+  <style>
+    body {
+      font-family: system-ui, Arial;
+      text-align: center;
+      padding: 40px;
+      background: #f7f8fa;
+      color: #222;
+    }
+    .card {
+      display: inline-block;
+      background: white;
+      padding: 25px 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      background: #6c63ff;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #5548d9;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h2>AI VisionGuard Push Notification Test</h2>
+    <p>Click the button below to allow push notifications.</p>
+    <button id="allowBtn">Allow Notifications 🔔</button>
+    <p>Once subscribed, you’ll get real-time alerts from your Raspberry Pi.</p>
+    <a href="https://twitch.tv/YOUR_TWITCH_CHANNEL" target="_blank">
+      ▶ Watch Live Stream
+    </a>
+  </div>
+
+  <script>
+    // ✅ OneSignal Initialization (v16)
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function (OneSignal) {
+      try {
+        // initialize
+        await OneSignal.init({
+          appId: "34f002f6-4328-4ab5-bcb2-e24a4f210971", // your App ID
+          allowLocalhostAsSecureOrigin: true, // allow localhost testing
+        });
+        console.log("✅ OneSignal Initialized");
+
+        // --- Force show prompt on button click ---
+        document.getElementById("allowBtn").addEventListener("click", async () => {
+          try {
+            console.log("🔔 Requesting notification permission...");
+            await OneSignal.Slidedown.promptPush();  // <== show OneSignal prompt
+            const permission = await OneSignal.Notifications.permission;
+            console.log("Permission state:", permission);
+
+            if (permission === "granted") {
+              await OneSignal.login("shahzad-phone");
+              alert("✅ Notifications enabled successfully!");
+            } else {
+              alert("❌ Please allow notifications manually from browser settings.");
+            }
+          } catch (err) {
+            console.error("Error requesting permission:", err);
+            alert("Something went wrong while requesting permission. Check console.");
+          }
+        });
+
+      } catch (error) {
+        console.error("Initialization failed:", error);
+      }
+    });
+  </script>
+</body>
+</html>
