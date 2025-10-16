@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>AI VisionGuard - Alerts History</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    body{
+      font-family: system-ui, Arial, sans-serif;
+      background:#f5f6fa;
+      margin:0;
+      padding:30px;
+    }
+    .container{
+      max-width:900px;
+      margin:auto;
+    }
+    h1{
+      color:#333;
+      text-align:center;
+    }
+    .auth-box, .alert-box{
+      background:white;
+      border-radius:14px;
+      padding:20px;
+      box-shadow:0 6px 18px rgba(0,0,0,.08);
+      margin-bottom:20px;
+    }
+    .btn{
+      background:#6c63ff;
+      border:none;
+      color:white;
+      padding:10px 18px;
+      border-radius:8px;
+      cursor:pointer;
+    }
+    .btn:hover{
+      background:#514bdb;
+    }
+    .card{
+      border:1px solid #eee;
+      border-radius:12px;
+      margin:12px 0;
+      padding:12px;
+      display:flex;
+      gap:14px;
+      align-items:center;
+      box-shadow:0 4px 10px rgba(0,0,0,.05);
+    }
+    img{
+      width:140px;
+      height:auto;
+      border-radius:10px;
+    }
+    .muted{color:#777;font-size:13px;}
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>AI VisionGuard Alerts</h1>
+
+  <div class="auth-box" id="authBox">
+    <h3>Login</h3>
+    <input id="email" type="email" placeholder="Email" style="padding:8px;width:90%;margin:5px 0;"/><br/>
+    <input id="password" type="password" placeholder="Password" style="padding:8px;width:90%;margin:5px 0;"/><br/>
+    <button id="loginBtn" class="btn">Login</button>
+    <p id="loginMsg" class="muted"></p>
+  </div>
+
+  <div class="alert-box" id="alertsBox" style="display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <h3>Detected Alerts</h3>
+      <button id="logoutBtn" class="btn">Logout</button>
+    </div>
+    <div id="alertList"></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://gwlvjpykmjxltiarrvyv.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3bHZqcHlrbWp4bHRpYXJydnl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MTQ2NTEsImV4cCI6MjA3NjE5MDY1MX0.0awguN5ZMtDY4J-aQJOo1sfwE04cql0QMPRWmLe9jiI";
+
+const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const emailInput = document.getElementById("email");
+const passInput = document.getElementById("password");
+const loginBtn = document.getElementById("loginBtn");
+const loginMsg = document.getElementById("loginMsg");
+const authBox = document.getElementById("authBox");
+const alertsBox = document.getElementById("alertsBox");
+const logoutBtn = document.getElementById("logoutBtn");
+const alertList = document.getElementById("alertList");
+
+async function loadAlerts() {
+  const { data, error } = await client
+    .from("alerts")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  
+  if (error) {
+    alert("Error loading alerts: " + error.message);
+    return;
+  }
+
+  alertList.innerHTML = "";
+  if (data.length === 0) {
+    alertList.innerHTML = "<p class='muted'>No alerts recorded yet.</p>";
+    return;
+  }
+
+  data.forEach(a => {
+    const div = document.createElement("div");
+    div.className = "card";
+    div.innerHTML = `
+      <img src="${a.snapshot_url || ''}" alt="snapshot"/>
+      <div>
+        <b>Type:</b> ${a.type}<br/>
+        <b>Person:</b> ${a.person || '-'}<br/>
+        <span class='muted'>${new Date(a.created_at).toLocaleString()}</span><br/>
+        ${a.snapshot_url ? `<a class="btn" href="${a.snapshot_url}" target="_blank">Open Image</a>` : ""}
+      </div>
+    `;
+    alertList.appendChild(div);
+  });
+}
+
+loginBtn.onclick = async () => {
+  const email = emailInput.value.trim();
+  const password = passInput.value.trim();
+  if (!email || !password) {
+    loginMsg.textContent = "Please fill both fields.";
+    return;
+  }
+  loginMsg.textContent = "Logging in...";
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
+  if (error) {
+    loginMsg.textContent = "❌ " + error.message;
+  } else {
+    loginMsg.textContent = "";
+    authBox.style.display = "none";
+    alertsBox.style.display = "block";
+    await loadAlerts();
+  }
+};
+
+logoutBtn.onclick = async () => {
+  await client.auth.signOut();
+  alertsBox.style.display = "none";
+  authBox.style.display = "block";
+  emailInput.value = "";
+  passInput.value = "";
+};
+</script>
+</body>
+</html>
