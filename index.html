@@ -1,5 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI VisionGuard Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@latest/css/pico.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async></script>
+  <style>
+    body { background:#f8f9fc; text-align:center; margin-top:40px; }
+    section { max-width:650px; margin:auto; }
+    .alert-card {
+      background:white; border-radius:10px; padding:1rem; margin-bottom:1rem;
+      box-shadow:0 1px 6px rgba(0,0,0,0.1); text-align:left;
+    }
+    img.thumb { width:100px; border-radius:6px; margin-right:1rem; }
+    .row { display:flex; align-items:center; }
+    nav button { margin:5px; }
+  </style>
+</head>
+<body>
+
+  <h2>🚨 AI VisionGuard Dashboard</h2>
+
+  <nav id="navBar">
+    <button id="homeBtn" class="contrast">Home</button>
+    <button id="alertsBtn" class="secondary">Alerts</button>
+  </nav>
+
+  <!-- 🏠 HOME SECTION -->
+  <section id="homeSection">
+    <h3>Push Notification Setup</h3>
+    <p>Click below to enable alerts for detection events.</p>
+    <button id="allowNotif" class="contrast" disabled>Loading...</button>
+    <p>Once subscribed, you’ll get live alerts from your Raspberry Pi.</p>
+    <a href="https://twitch.tv/" target="_blank">▶ Watch Live Stream</a>
+  </section>
+
+  <!-- 🔐 LOGIN SECTION -->
+  <section id="loginSection" style="display:none;">
+    <h3>Admin Login</h3>
+    <input id="loginEmail" type="email" placeholder="Email" />
+    <input id="loginPassword" type="password" placeholder="Password" />
+    <button id="loginBtn" class="contrast">Login</button>
+    <p id="loginMsg"></p>
+  </section>
+
+  <!-- ⚠️ ALERTS SECTION -->
+  <section id="alertsSection" style="display:none;">
+    <h3>Detected Alerts</h3>
+    <div id="alertList">Loading alerts...</div>
+  </section>
+
 <script>
-window.addEventListener("load", function() {
+window.addEventListener("DOMContentLoaded", async () => {
 
   // ===== Supabase Init =====
   const supabaseUrl = "https://gwlvjpykmjxltiarrvyv.supabase.co";
@@ -23,51 +77,52 @@ window.addEventListener("load", function() {
   login.style.display = "none";
   alerts.style.display = "none";
 
-  // ===== OneSignal Setup =====
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(async function(OneSignal) {
-    await OneSignal.init({
-      appId: "34f002f6-4328-4ab5-bcb2-e24a4f210971",
-      notifyButton: { enable: false },
-      promptOptions: { slidedown: { enabled: false } }
+  // ===== OneSignal Init (with guaranteed wait) =====
+  const oneSignalReady = new Promise((resolve) => {
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.OneSignalDeferred.push(async (OneSignal) => {
+      await OneSignal.init({
+        appId: "34f002f6-4328-4ab5-bcb2-e24a4f210971",
+        notifyButton: { enable: false },
+        promptOptions: { slidedown: { enabled: false } },
+      });
+      console.log("✅ OneSignal initialized");
+      resolve(OneSignal);
     });
-
-    console.log("✅ OneSignal initialized");
-
-    // Enable button once ready
-    allowBtn.disabled = false;
-    allowBtn.textContent = "Allow Notifications 🔔";
-
-    // Button click handler — actual prompt trigger
-    allowBtn.addEventListener("click", async () => {
-      try {
-        const status = await OneSignal.getNotificationPermission();
-        console.log("Permission status:", status);
-
-        if (status === "granted") {
-          alert("✅ Notifications already allowed!");
-        } else {
-          // Must call this directly on click (browser rule)
-          await OneSignal.registerForPushNotifications({
-            modalPrompt: true
-          });
-          alert("✅ Notifications enabled successfully!");
-        }
-      } catch (e) {
-        console.error("❌ OneSignal error:", e);
-        alert("❌ Failed to enable notifications. Check browser permission settings.");
-      }
-    });
-
-    // Auto prompt after small delay if not allowed
-    setTimeout(async () => {
-      const status = await OneSignal.getNotificationPermission();
-      if (status === "default") {
-        console.log("Auto prompting for permission...");
-        OneSignal.showNativePrompt(); // more reliable for Chrome/Edge
-      }
-    }, 3000);
   });
+
+  // Wait for OneSignal before enabling button
+  const OneSignal = await oneSignalReady;
+  allowBtn.disabled = false;
+  allowBtn.textContent = "Allow Notifications 🔔";
+
+  // ===== Manual Permission Trigger =====
+  allowBtn.addEventListener("click", async () => {
+    try {
+      const status = await OneSignal.getNotificationPermission();
+      console.log("Permission:", status);
+
+      if (status === "granted") {
+        alert("✅ Notifications already allowed!");
+      } else {
+        // Browser prompt triggered directly by user interaction
+        await OneSignal.registerForPushNotifications({ modalPrompt: true });
+        alert("✅ Notifications enabled successfully!");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("❌ Failed to enable notifications. Check browser settings.");
+    }
+  });
+
+  // ===== Auto prompt after few seconds if not allowed =====
+  setTimeout(async () => {
+    const status = await OneSignal.getNotificationPermission();
+    if (status === "default") {
+      console.log("⏳ Auto prompting notification...");
+      OneSignal.showNativePrompt();
+    }
+  }, 3000);
 
   // ===== Load Alerts =====
   async function loadAlerts() {
@@ -113,7 +168,7 @@ window.addEventListener("load", function() {
   loginBtn.onclick = async () => {
     const { error } = await supabaseClient.auth.signInWithPassword({
       email: loginEmail.value,
-      password: loginPassword.value
+      password: loginPassword.value,
     });
     if (error) {
       loginMsg.textContent = "❌ Login failed";
@@ -143,6 +198,7 @@ window.addEventListener("load", function() {
 
   // ===== Init =====
   checkSession();
-
 });
 </script>
+</body>
+</html>
