@@ -10,8 +10,10 @@
   <style>
     body { background:#f8f9fc; text-align:center; margin-top:40px; }
     section { max-width:650px; margin:auto; }
-    .alert-card { background:white; border-radius:10px; padding:1rem; margin-bottom:1rem;
-      box-shadow:0 1px 6px rgba(0,0,0,0.1); text-align:left; }
+    .alert-card {
+      background:white; border-radius:10px; padding:1rem; margin-bottom:1rem;
+      box-shadow:0 1px 6px rgba(0,0,0,0.1); text-align:left;
+    }
     img.thumb { width:100px; border-radius:6px; margin-right:1rem; }
     .row { display:flex; align-items:center; }
     nav button { margin:5px; }
@@ -50,116 +52,128 @@
     <div id="alertList">Loading alerts...</div>
   </section>
 
-<script defer>
-document.addEventListener("DOMContentLoaded",()=>{
+<script>
+window.addEventListener("load", function() {
+
   // ===== Supabase init =====
   const supabaseUrl="https://gwlvjpykmjxltiarrvyv.supabase.co";
   const supabaseKey="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3bHZqcHlrbWp4bHRpYXJydnl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MTQ2NTEsImV4cCI6MjA3NjE5MDY1MX0.0awguN5ZMtDY4J-aQJOo1sfwE04cql0QMPRWmLe9jiI";
-  const supabaseClient=window.supabase.createClient(supabaseUrl,supabaseKey);
+  const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-  // ===== DOM refs =====
-  const homeBtn=document.getElementById("homeBtn"),
-        alertsBtn=document.getElementById("alertsBtn"),
-        home=document.getElementById("homeSection"),
-        alerts=document.getElementById("alertsSection"),
-        login=document.getElementById("loginSection"),
-        loginBtn=document.getElementById("loginBtn"),
-        loginEmail=document.getElementById("loginEmail"),
-        loginPassword=document.getElementById("loginPassword"),
-        loginMsg=document.getElementById("loginMsg");
+  // ===== DOM elements =====
+  const home = document.getElementById("homeSection");
+  const login = document.getElementById("loginSection");
+  const alerts = document.getElementById("alertsSection");
+  const homeBtn = document.getElementById("homeBtn");
+  const alertsBtn = document.getElementById("alertsBtn");
+  const loginBtn = document.getElementById("loginBtn");
+  const loginEmail = document.getElementById("loginEmail");
+  const loginPassword = document.getElementById("loginPassword");
+  const loginMsg = document.getElementById("loginMsg");
 
-  // ===== Default state: Home visible only =====
-  home.style.display="block";
-  login.style.display="none";
-  alerts.style.display="none";
+  // Default view: show only home
+  home.style.display = "block";
+  login.style.display = "none";
+  alerts.style.display = "none";
 
   // ===== Load alerts =====
-  async function loadAlerts(){
-    try{
-      const {data,error}=await supabaseClient.from("alerts").select("*").order("id",{ascending:false});
-      const div=document.getElementById("alertList");
-      if(error){div.innerHTML="Error loading alerts";return;}
-      if(!data||!data.length){div.innerHTML="No alerts recorded yet.";return;}
-      div.innerHTML="";
-      data.forEach(a=>{
-        const c=document.createElement("div");
-        c.className="alert-card row";
-        c.innerHTML=`<img class="thumb" src="${a.snapshot_url}" alt="snapshot"/>
-          <div><b>Type:</b> ${a.type}<br/><b>Person:</b> ${a.person}<br/>
-          <a class="contrast" target="_blank" href="${a.snapshot_url}">Open Image</a></div>`;
+  async function loadAlerts() {
+    const div = document.getElementById("alertList");
+    try {
+      const { data, error } = await supabaseClient.from("alerts").select("*").order("id", { ascending:false });
+      if (error) { div.innerHTML = "Error loading alerts"; return; }
+      if (!data || !data.length) { div.innerHTML = "No alerts recorded yet."; return; }
+      div.innerHTML = "";
+      data.forEach(a => {
+        const c = document.createElement("div");
+        c.className = "alert-card row";
+        c.innerHTML = `
+          <img class="thumb" src="${a.snapshot_url}" alt="snapshot"/>
+          <div>
+            <b>Type:</b> ${a.type}<br/>
+            <b>Person:</b> ${a.person}<br/>
+            <a class="contrast" target="_blank" href="${a.snapshot_url}">Open Image</a>
+          </div>`;
         div.appendChild(c);
       });
-    }catch(e){console.error(e);}
-  }
-
-  // ===== Login handling =====
-  async function checkSession(){
-    const {data}=await supabaseClient.auth.getSession();
-    if(data.session){
-      login.style.display="none";
-      alerts.style.display="block";
-      loadAlerts();
-      startAutoRefresh();
-    }else{
-      login.style.display="block";
-      alerts.style.display="none";
+    } catch (err) {
+      div.innerHTML = "⚠️ Could not fetch alerts.";
+      console.error(err);
     }
   }
 
-  loginBtn.onclick=async()=>{
-    const {error}=await supabaseClient.auth.signInWithPassword({
-      email:loginEmail.value,password:loginPassword.value
+  // ===== Auth session check =====
+  async function checkSession() {
+    const { data } = await supabaseClient.auth.getSession();
+    if (data.session) {
+      login.style.display = "none";
+      alerts.style.display = "block";
+      loadAlerts();
+      startAutoRefresh();
+    } else {
+      login.style.display = "block";
+      alerts.style.display = "none";
+    }
+  }
+
+  // ===== Login handler =====
+  loginBtn.onclick = async () => {
+    const { error } = await supabaseClient.auth.signInWithPassword({
+      email: loginEmail.value,
+      password: loginPassword.value
     });
-    if(error){loginMsg.textContent="❌ Login failed";return;}
-    loginMsg.textContent="✅ Logged in!";
+    if (error) {
+      loginMsg.textContent = "❌ Login failed";
+      return;
+    }
+    loginMsg.textContent = "✅ Logged in!";
     checkSession();
   };
 
-  // ===== Nav actions =====
-  homeBtn.onclick=()=>{
-    home.style.display="block";
-    login.style.display="none";
-    alerts.style.display="none";
+  // ===== Navigation =====
+  homeBtn.onclick = () => {
+    home.style.display = "block";
+    login.style.display = "none";
+    alerts.style.display = "none";
     stopAutoRefresh();
   };
 
-  alertsBtn.onclick=()=>{
-    home.style.display="none";
+  alertsBtn.onclick = () => {
+    home.style.display = "none";
     checkSession();
   };
 
-  // ===== Auto refresh for alerts =====
-  let refreshInterval=null;
-  function startAutoRefresh(){
+  // ===== Auto-refresh =====
+  let refreshInterval = null;
+  function startAutoRefresh() {
     stopAutoRefresh();
-    refreshInterval=setInterval(loadAlerts,30*1000);
+    refreshInterval = setInterval(loadAlerts, 30000);
   }
-  function stopAutoRefresh(){
-    if(refreshInterval){clearInterval(refreshInterval);refreshInterval=null;}
+  function stopAutoRefresh() {
+    if (refreshInterval) clearInterval(refreshInterval);
   }
 
-  // ===== OneSignal setup =====
-  window.OneSignalDeferred=window.OneSignalDeferred||[];
-  OneSignalDeferred.push(function(OneSignal){
+  // ===== OneSignal notifications =====
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(function(OneSignal) {
     OneSignal.init({
-      appId:"34f002f6-4328-4ab5-bcb2-e24a4f210971",
-      notifyButton:{enable:true},
-      promptOptions:{slidedown:{enabled:true}}
+      appId: "34f002f6-4328-4ab5-bcb2-e24a4f210971",
+      notifyButton: { enable: true },
+      promptOptions: { slidedown: { enabled: true } }
     });
 
-    // ✅ Manual trigger on button click
-    const allowBtn=document.getElementById("allowNotif");
-    if(allowBtn){
-      allowBtn.addEventListener("click",async()=>{
-        try{
-          const status=await OneSignal.getNotificationPermission();
-          if(status==="granted"){
+    const allowBtn = document.getElementById("allowNotif");
+    if (allowBtn) {
+      allowBtn.addEventListener("click", async () => {
+        try {
+          const status = await OneSignal.getNotificationPermission();
+          if (status === "granted") {
             alert("✅ Notifications already allowed!");
-          }else{
+          } else {
             await OneSignal.registerForPushNotifications();
             alert("✅ Notifications enabled successfully!");
           }
-        }catch(e){
+        } catch (e) {
           console.error(e);
           alert("❌ Failed to enable notifications. Check browser permissions.");
         }
@@ -167,7 +181,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     }
   });
 
-  // ===== Initialize app =====
+  // Start app
   checkSession();
 });
 </script>
