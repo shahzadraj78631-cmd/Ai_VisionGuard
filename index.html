@@ -1,101 +1,31 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI VisionGuard Dashboard</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@latest/css/pico.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async></script>
-  <style>
-    body { background:#f8f9fc; text-align:center; margin-top:50px; }
-    section { max-width:650px; margin:auto; }
-    .alert-card { background:white; border-radius:10px; padding:1rem; margin-bottom:1rem; box-shadow:0 1px 6px rgba(0,0,0,0.1); text-align:left; }
-    img.thumb { width:100px; border-radius:6px; margin-right:1rem; }
-    .row { display:flex; align-items:center; }
-  </style>
-</head>
-<body>
-
-  <h2>🚨 AI VisionGuard Dashboard</h2>
-
-  <nav>
-    <button id="homeBtn" class="secondary">Home</button>
-    <button id="alertsBtn" class="contrast">Alerts</button>
-  </nav>
-
-  <!-- 🏠 HOME SECTION -->
-  <section id="homeSection">
-    <h3>Push Notification Test</h3>
-    <p>Click below to enable alerts for detection events.</p>
-    <button id="allowNotif" class="contrast">Allow Notifications 🔔</button>
-    <p>Once subscribed, you’ll get live alerts from your Raspberry Pi.</p>
-    <a href="https://twitch.tv/" target="_blank">▶ Watch Live Stream</a>
-  </section>
-
-  <!-- ⚠️ ALERTS SECTION -->
-   <section id="loginSection" style="display:none;">
-  <h3>Admin Login</h3>
-  <input id="loginEmail" type="email" placeholder="Email" />
-  <input id="loginPassword" type="password" placeholder="Password" />
-  <button id="loginBtn" class="contrast">Login</button>
-  <p id="loginMsg"></p>
-</section>
-
-  <section id="alertsSection" style="display:none;">
-    <h3>Detected Alerts</h3>
-    <div id="alertList">Loading alerts...</div>
-  </section>
-
 <script>
-  const loginSection = document.getElementById("loginSection");
-const loginBtn = document.getElementById("loginBtn");
-const loginEmail = document.getElementById("loginEmail");
-const loginPassword = document.getElementById("loginPassword");
-const loginMsg = document.getElementById("loginMsg");
-
-loginBtn.onclick = async () => {
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email: loginEmail.value,
-    password: loginPassword.value
-  });
-  if (error) {
-    loginMsg.textContent = "❌ Login failed";
-  } else {
-    loginSection.style.display = "none";
-    alertsSection.style.display = "block";
-    loadAlerts();
-  }
-};
-
-  // 🔁 Toggle sections
-  const homeBtn=document.getElementById("homeBtn"),
-        alertsBtn=document.getElementById("alertsBtn"),
-        home=document.getElementById("homeSection"),
-        alerts=document.getElementById("alertsSection");
-  homeBtn.onclick=()=>{home.style.display="block";alerts.style.display="none";}
-  alertsBtn.onclick=()=>{home.style.display="none";alerts.style.display="block";loadAlerts();}
-
-  // 🔔 OneSignal setup
-  window.OneSignalDeferred=window.OneSignalDeferred||[];
-  OneSignalDeferred.push(function(OneSignal){
-    OneSignal.init({
-      appId:"34f002f6-4328-4ab5-bcb2-e24a4f210971",
-      safari_web_id:"",
-      notifyButton:{enable:true},
-    });
-  });
-
-  // ⚙️ Supabase fetch alerts
-  const supabaseUrl="https://gwlvjpykmjxltiarrvyv.supabase.co";
-  const supabaseKey="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3bHZqcHlrbWp4bHRpYXJydnl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MTQ2NTEsImV4cCI6MjA3NjE5MDY1MX0.0awguN5ZMtDY4J-aQJOo1sfwE04cql0QMPRWmLe9jiI";
+  // ========= Supabase setup =========
+  const supabaseUrl = "https://gwlvjpykmjxltiarrvyv.supabase.co";
+  const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3bHZqcHlrbWp4bHRpYXJydnl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MTQ2NTEsImV4cCI6MjA3NjE5MDY1MX0.0awguN5ZMtDY4J-aQJOo1sfwE04cql0QMPRWmLe9jiI";
   const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
+  // ========= DOM references =========
+  const homeBtn = document.getElementById("homeBtn");
+  const alertsBtn = document.getElementById("alertsBtn");
+  const home = document.getElementById("homeSection");
+  const alerts = document.getElementById("alertsSection");
+  const loginSection = document.getElementById("loginSection");
+  const loginBtn = document.getElementById("loginBtn");
+  const loginEmail = document.getElementById("loginEmail");
+  const loginPassword = document.getElementById("loginPassword");
+  const loginMsg = document.getElementById("loginMsg");
+
+  // ========= Load alerts =========
   async function loadAlerts(){
-    const {data,error}=await supabaseClient.from("alerts").select("*").order("id",{ascending:false});
-    const div=document.getElementById("alertList");
-    if(error){div.innerHTML="Error loading alerts";return;}
-    if(!data||!data.length){div.innerHTML="No alerts recorded yet.";return;}
+    const { data, error } = await supabaseClient
+      .from("alerts")
+      .select("*")
+      .order("id",{ ascending:false });
+
+    const div = document.getElementById("alertList");
+    if(error){ div.innerHTML="Error loading alerts"; return; }
+    if(!data || !data.length){ div.innerHTML="No alerts recorded yet."; return; }
+
     div.innerHTML="";
     data.forEach(a=>{
       const c=document.createElement("div");
@@ -110,26 +40,64 @@ loginBtn.onclick = async () => {
       div.appendChild(c);
     });
   }
-  // 🔁 Auto refresh every 30 seconds when Alerts tab is open
-let refreshInterval = null;
 
-alertsBtn.onclick = () => {
-  home.style.display = "none";
-  alerts.style.display = "block";
-  loadAlerts();
-  if (refreshInterval) clearInterval(refreshInterval);
-  refreshInterval = setInterval(loadAlerts, 30 * 1000);
-};
+  // ========= Login logic =========
+  let userSession = null;
 
-homeBtn.onclick = () => {
-  home.style.display = "block";
-  alerts.style.display = "none";
-  if (refreshInterval) {
-    clearInterval(refreshInterval);
-    refreshInterval = null;
+  async function checkSession(){
+    const { data } = await supabaseClient.auth.getSession();
+    userSession = data.session;
+    if(userSession){
+      loginSection.style.display = "none";
+      alerts.style.display = "block";
+      loadAlerts();
+    } else {
+      loginSection.style.display = "block";
+      alerts.style.display = "none";
+    }
   }
-};
 
+  loginBtn.onclick = async () => {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email: loginEmail.value,
+      password: loginPassword.value
+    });
+    if(error){
+      loginMsg.textContent = "❌ Login failed. Check email/password.";
+    } else {
+      loginMsg.textContent = "✅ Logged in successfully!";
+      await checkSession();
+    }
+  };
+
+  // ========= Toggle buttons =========
+  homeBtn.onclick = () => {
+    home.style.display="block";
+    loginSection.style.display="none";
+    alerts.style.display="none";
+  };
+
+  alertsBtn.onclick = async () => {
+    home.style.display="none";
+    await checkSession();
+  };
+
+  // ========= Auto refresh =========
+  let refreshInterval = null;
+  function startAutoRefresh(){
+    if(refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = setInterval(loadAlerts, 30 * 1000);
+  }
+
+  // ========= OneSignal setup =========
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(function(OneSignal){
+    OneSignal.init({
+      appId: "34f002f6-4328-4ab5-bcb2-e24a4f210971",
+      notifyButton: { enable: true }
+    });
+  });
+
+  // ========= Init =========
+  checkSession();
 </script>
-</body>
-</html>
