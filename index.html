@@ -23,14 +23,14 @@
 
   <h2>🚨 AI VisionGuard Dashboard</h2>
 
-  <nav>
+  <nav id="navBar">
     <button id="homeBtn" class="contrast">Home</button>
     <button id="alertsBtn" class="secondary">Alerts</button>
   </nav>
 
   <!-- 🏠 HOME SECTION -->
   <section id="homeSection">
-    <h3>Push Notification Test</h3>
+    <h3>Push Notification Setup</h3>
     <p>Click below to enable alerts for detection events.</p>
     <button id="allowNotif" class="contrast">Allow Notifications 🔔</button>
     <p>Once subscribed, you’ll get live alerts from your Raspberry Pi.</p>
@@ -55,28 +55,69 @@
 <script>
 window.addEventListener("load", function() {
 
-  // ===== Supabase init =====
+  // ===== SUPABASE INIT =====
   const supabaseUrl="https://gwlvjpykmjxltiarrvyv.supabase.co";
   const supabaseKey="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3bHZqcHlrbWp4bHRpYXJydnl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MTQ2NTEsImV4cCI6MjA3NjE5MDY1MX0.0awguN5ZMtDY4J-aQJOo1sfwE04cql0QMPRWmLe9jiI";
   const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-  // ===== DOM elements =====
-  const home = document.getElementById("homeSection");
-  const login = document.getElementById("loginSection");
-  const alerts = document.getElementById("alertsSection");
-  const homeBtn = document.getElementById("homeBtn");
-  const alertsBtn = document.getElementById("alertsBtn");
-  const loginBtn = document.getElementById("loginBtn");
-  const loginEmail = document.getElementById("loginEmail");
-  const loginPassword = document.getElementById("loginPassword");
-  const loginMsg = document.getElementById("loginMsg");
+  // ===== DOM ELEMENTS =====
+  const home=document.getElementById("homeSection");
+  const login=document.getElementById("loginSection");
+  const alerts=document.getElementById("alertsSection");
+  const nav=document.getElementById("navBar");
+  const homeBtn=document.getElementById("homeBtn");
+  const alertsBtn=document.getElementById("alertsBtn");
+  const loginBtn=document.getElementById("loginBtn");
+  const loginEmail=document.getElementById("loginEmail");
+  const loginPassword=document.getElementById("loginPassword");
+  const loginMsg=document.getElementById("loginMsg");
 
-  // Default view: show only home
-  home.style.display = "block";
-  login.style.display = "none";
-  alerts.style.display = "none";
+  // ===== INITIAL VIEW =====
+  home.style.display="block";
+  login.style.display="none";
+  alerts.style.display="none";
 
-  // ===== Load alerts =====
+  // ===== AUTO-ASK NOTIFICATION PERMISSION =====
+  function autoPromptNotifications() {
+    if (Notification.permission === "default") {
+      setTimeout(() => {
+        OneSignalDeferred.push(function(OneSignal){
+          OneSignal.registerForPushNotifications();
+        });
+      }, 1500);
+    }
+  }
+
+  // ===== ONE SIGNAL SETUP =====
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(function(OneSignal) {
+    OneSignal.init({
+      appId: "34f002f6-4328-4ab5-bcb2-e24a4f210971",
+      notifyButton: { enable: false },
+      promptOptions: { slidedown: { enabled: false } }
+    });
+
+    // Manual Allow Button
+    const allowBtn = document.getElementById("allowNotif");
+    allowBtn.addEventListener("click", async () => {
+      try {
+        const status = await OneSignal.getNotificationPermission();
+        if (status === "granted") {
+          alert("✅ Notifications already allowed!");
+        } else {
+          await OneSignal.registerForPushNotifications();
+          alert("✅ Notifications enabled successfully!");
+        }
+      } catch (err) {
+        alert("❌ Could not enable notifications. Check browser settings.");
+      }
+    });
+
+    // auto prompt on load
+    autoPromptNotifications();
+  });
+
+  // ===== ALERT FETCHER =====
   async function loadAlerts() {
     const div = document.getElementById("alertList");
     try {
@@ -89,34 +130,35 @@ window.addEventListener("load", function() {
         c.className = "alert-card row";
         c.innerHTML = `
           <img class="thumb" src="${a.snapshot_url}" alt="snapshot"/>
-          <div>
-            <b>Type:</b> ${a.type}<br/>
-            <b>Person:</b> ${a.person}<br/>
-            <a class="contrast" target="_blank" href="${a.snapshot_url}">Open Image</a>
-          </div>`;
+          <div><b>Type:</b> ${a.type}<br/>
+          <b>Person:</b> ${a.person}<br/>
+          <a class="contrast" target="_blank" href="${a.snapshot_url}">Open Image</a></div>`;
         div.appendChild(c);
       });
-    } catch (err) {
-      div.innerHTML = "⚠️ Could not fetch alerts.";
-      console.error(err);
+    } catch (e) {
+      console.error(e);
+      div.innerHTML = "⚠️ Could not load alerts.";
     }
   }
 
-  // ===== Auth session check =====
+  // ===== LOGIN CHECK =====
   async function checkSession() {
     const { data } = await supabaseClient.auth.getSession();
     if (data.session) {
       login.style.display = "none";
+      home.style.display = "none";
       alerts.style.display = "block";
+      nav.style.display = "none"; // hide nav after login
       loadAlerts();
       startAutoRefresh();
     } else {
       login.style.display = "block";
       alerts.style.display = "none";
+      nav.style.display = "block";
     }
   }
 
-  // ===== Login handler =====
+  // ===== LOGIN HANDLER =====
   loginBtn.onclick = async () => {
     const { error } = await supabaseClient.auth.signInWithPassword({
       email: loginEmail.value,
@@ -130,11 +172,12 @@ window.addEventListener("load", function() {
     checkSession();
   };
 
-  // ===== Navigation =====
+  // ===== NAV BUTTONS =====
   homeBtn.onclick = () => {
     home.style.display = "block";
     login.style.display = "none";
     alerts.style.display = "none";
+    nav.style.display = "block";
     stopAutoRefresh();
   };
 
@@ -143,46 +186,14 @@ window.addEventListener("load", function() {
     checkSession();
   };
 
-  // ===== Auto-refresh =====
-  let refreshInterval = null;
-  function startAutoRefresh() {
-    stopAutoRefresh();
-    refreshInterval = setInterval(loadAlerts, 30000);
-  }
-  function stopAutoRefresh() {
-    if (refreshInterval) clearInterval(refreshInterval);
-  }
+  // ===== AUTO REFRESH =====
+  let refreshInterval=null;
+  function startAutoRefresh(){ stopAutoRefresh(); refreshInterval=setInterval(loadAlerts,30000); }
+  function stopAutoRefresh(){ if(refreshInterval) clearInterval(refreshInterval); }
 
-  // ===== OneSignal notifications =====
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(function(OneSignal) {
-    OneSignal.init({
-      appId: "34f002f6-4328-4ab5-bcb2-e24a4f210971",
-      notifyButton: { enable: true },
-      promptOptions: { slidedown: { enabled: true } }
-    });
-
-    const allowBtn = document.getElementById("allowNotif");
-    if (allowBtn) {
-      allowBtn.addEventListener("click", async () => {
-        try {
-          const status = await OneSignal.getNotificationPermission();
-          if (status === "granted") {
-            alert("✅ Notifications already allowed!");
-          } else {
-            await OneSignal.registerForPushNotifications();
-            alert("✅ Notifications enabled successfully!");
-          }
-        } catch (e) {
-          console.error(e);
-          alert("❌ Failed to enable notifications. Check browser permissions.");
-        }
-      });
-    }
-  });
-
-  // Start app
+  // INIT CHECK
   checkSession();
+
 });
 </script>
 </body>
