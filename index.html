@@ -34,12 +34,40 @@
   </section>
 
   <!-- ⚠️ ALERTS SECTION -->
+   <section id="loginSection" style="display:none;">
+  <h3>Admin Login</h3>
+  <input id="loginEmail" type="email" placeholder="Email" />
+  <input id="loginPassword" type="password" placeholder="Password" />
+  <button id="loginBtn" class="contrast">Login</button>
+  <p id="loginMsg"></p>
+</section>
+
   <section id="alertsSection" style="display:none;">
     <h3>Detected Alerts</h3>
     <div id="alertList">Loading alerts...</div>
   </section>
 
 <script>
+  const loginSection = document.getElementById("loginSection");
+const loginBtn = document.getElementById("loginBtn");
+const loginEmail = document.getElementById("loginEmail");
+const loginPassword = document.getElementById("loginPassword");
+const loginMsg = document.getElementById("loginMsg");
+
+loginBtn.onclick = async () => {
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email: loginEmail.value,
+    password: loginPassword.value
+  });
+  if (error) {
+    loginMsg.textContent = "❌ Login failed";
+  } else {
+    loginSection.style.display = "none";
+    alertsSection.style.display = "block";
+    loadAlerts();
+  }
+};
+
   // 🔁 Toggle sections
   const homeBtn=document.getElementById("homeBtn"),
         alertsBtn=document.getElementById("alertsBtn"),
@@ -82,6 +110,26 @@
       div.appendChild(c);
     });
   }
+  // 🔁 Auto refresh every 30 seconds when Alerts tab is open
+let refreshInterval = null;
+
+alertsBtn.onclick = () => {
+  home.style.display = "none";
+  alerts.style.display = "block";
+  loadAlerts();
+  if (refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(loadAlerts, 30 * 1000);
+};
+
+homeBtn.onclick = () => {
+  home.style.display = "block";
+  alerts.style.display = "none";
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+  }
+};
+
 </script>
 </body>
 </html>
