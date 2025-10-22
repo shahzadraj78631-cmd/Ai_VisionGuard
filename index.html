@@ -3,89 +3,85 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI VisionGuard Alerts</title>
-
-  <!-- ✅ OneSignal SDK v16 -->
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-
+  <title>AI VisionGuard Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@latest/css/pico.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async></script>
   <style>
-    body {
-      font-family: system-ui, Arial;
-      text-align: center;
-      padding: 40px;
-      background: #f5f6fa;
-      color: #222;
-    }
-    .card {
-      background: #fff;
-      padding: 25px 40px;
-      border-radius: 14px;
-      box-shadow: 0 5px 12px rgba(0,0,0,0.1);
-      display: inline-block;
-    }
-    button {
-      margin-top: 15px;
-      padding: 10px 25px;
-      border: none;
-      border-radius: 8px;
-      background: #6c63ff;
-      color: #fff;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #524ed2;
-    }
+    body { background:#f8f9fc; text-align:center; margin-top:50px; }
+    section { max-width:650px; margin:auto; }
+    .alert-card { background:white; border-radius:10px; padding:1rem; margin-bottom:1rem; box-shadow:0 1px 6px rgba(0,0,0,0.1); text-align:left; }
+    img.thumb { width:100px; border-radius:6px; margin-right:1rem; }
+    .row { display:flex; align-items:center; }
   </style>
 </head>
-
 <body>
-  <div class="card">
-    <h2>AI VisionGuard Push Notification Test</h2>
+
+  <h2>🚨 AI VisionGuard Dashboard</h2>
+
+  <nav>
+    <button id="homeBtn" class="secondary">Home</button>
+    <button id="alertsBtn" class="contrast">Alerts</button>
+  </nav>
+
+  <!-- 🏠 HOME SECTION -->
+  <section id="homeSection">
+    <h3>Push Notification Test</h3>
     <p>Click below to enable alerts for detection events.</p>
-    <button id="allowBtn">Allow Notifications 🔔</button>
+    <button id="allowNotif" class="contrast">Allow Notifications 🔔</button>
     <p>Once subscribed, you’ll get live alerts from your Raspberry Pi.</p>
-    <a href="https://www.twitch.tv/mr_ali12345678" target="_blank">▶ Watch Live Stream</a>
-  </div>
+    <a href="https://twitch.tv/" target="_blank">▶ Watch Live Stream</a>
+  </section>
 
-  <script>
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function (OneSignal) {
-      try {
-        // ✅ Initialize SDK
-        await OneSignal.init({
-          appId: "34f002f6-4328-4ab5-bcb2-e24a4f210971",
-          allowLocalhostAsSecureOrigin: true,
-          notifyButton: { enable: true }, // show default bell
-        });
-        console.log("✅ OneSignal initialized");
+  <!-- ⚠️ ALERTS SECTION -->
+  <section id="alertsSection" style="display:none;">
+    <h3>Detected Alerts</h3>
+    <div id="alertList">Loading alerts...</div>
+  </section>
 
-        // 🔔 Fallback manual trigger (hybrid)
-        document.getElementById("allowBtn").addEventListener("click", async () => {
-          try {
-            console.log("🔔 Trying to show permission prompt...");
-            // First, show the built-in slidedown prompt manually
-            await OneSignal.Slidedown.promptPush();
+<script>
+  // 🔁 Toggle sections
+  const homeBtn=document.getElementById("homeBtn"),
+        alertsBtn=document.getElementById("alertsBtn"),
+        home=document.getElementById("homeSection"),
+        alerts=document.getElementById("alertsSection");
+  homeBtn.onclick=()=>{home.style.display="block";alerts.style.display="none";}
+  alertsBtn.onclick=()=>{home.style.display="none";alerts.style.display="block";loadAlerts();}
 
-            // Then recheck permission
-            const permission = await OneSignal.Notifications.permission;
-            console.log("Permission:", permission);
-
-            if (permission === "granted") {
-              alert("✅ Notifications enabled successfully!");
-            } else {
-              alert("❌ Please allow notifications manually from browser settings.");
-            }
-          } catch (err) {
-            console.error("Error while prompting:", err);
-            alert("⚠️ Unable to show notification permission prompt. Check console for details.");
-          }
-        });
-      } catch (e) {
-        console.error("Init failed:", e);
-      }
+  // 🔔 OneSignal setup
+  window.OneSignalDeferred=window.OneSignalDeferred||[];
+  OneSignalDeferred.push(function(OneSignal){
+    OneSignal.init({
+      appId:"34f002f6-4328-4ab5-bcb2-e24a4f210971",
+      safari_web_id:"",
+      notifyButton:{enable:true},
     });
-  </script>
+  });
+
+  // ⚙️ Supabase fetch alerts
+  const supabaseUrl="https://gwlvjpykmjxltiarrvyv.supabase.co";
+  const supabaseKey="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3bHZqcHlrbWp4bHRpYXJydnl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MTQ2NTEsImV4cCI6MjA3NjE5MDY1MX0.0awguN5ZMtDY4J-aQJOo1sfwE04cql0QMPRWmLe9jiI";
+  const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+  async function loadAlerts(){
+    const {data,error}=await supabaseClient.from("alerts").select("*").order("id",{ascending:false});
+    const div=document.getElementById("alertList");
+    if(error){div.innerHTML="Error loading alerts";return;}
+    if(!data||!data.length){div.innerHTML="No alerts recorded yet.";return;}
+    div.innerHTML="";
+    data.forEach(a=>{
+      const c=document.createElement("div");
+      c.className="alert-card row";
+      c.innerHTML=`
+        <img class="thumb" src="${a.snapshot_url}" alt="snapshot"/>
+        <div>
+          <b>Type:</b> ${a.type}<br/>
+          <b>Person:</b> ${a.person}<br/>
+          <a class="contrast" target="_blank" href="${a.snapshot_url}">Open Image</a>
+        </div>`;
+      div.appendChild(c);
+    });
+  }
+</script>
 </body>
 </html>
-
